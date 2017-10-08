@@ -32,7 +32,8 @@ def main():
     chainer.config.train = False
 
     # Dataset
-    dataset = DatasetfromMongoDB(db_name=args.db_name, col_name=args.col_name)
+    dataset = DatasetfromMongoDB(
+        db_name=args.db_name, col_name=args.col_name, _id=True)
     with open(os.path.join(args.out, 'labels.json'), 'r') as f:
         labels = json.load(f)
     n_classes = len(labels)

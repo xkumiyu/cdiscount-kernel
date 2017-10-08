@@ -34,21 +34,23 @@ def main():
                         help='Interval of displaying log to console')
     args = parser.parse_args()
 
+    print('GPU: {}'.format(args.gpu))
+    print('# minibatch size: {}'.format(args.batchsize))
+    print('# epoch: {}'.format(args.epoch))
+
     # Dataset
     dataset = DatasetfromMongoDB(db_name=args.db_name, col_name=args.col_name)
     labels = dataset.get_labels()
-    with open(os.path.join(args.out, 'labels.json'), 'w') as f:
-        json.dump({v: k for k, v in labels.items()}, f)
     n_classes = len(labels)
+
+    print('# number of label: {}'.format(n_classes))
 
     split_at = int(len(dataset) * args.split_rate)
     train, test = chainer.datasets.split_dataset(dataset, split_at)
 
-    print('GPU: {}'.format(args.gpu))
     print('# train samples: {}'.format(len(train)))
     print('# test samples: {}'.format(len(test)))
     print('# data shape: {}'.format(train[0][0].shape))
-    print('# number of label: {}'.format(n_classes))
 
     # Iterator
     train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
@@ -77,15 +79,18 @@ def main():
         'epoch', 'main/loss', 'main/accuracy',
         'validation/main/loss', 'validation/main/accuracy', 'elapsed_time']))
     trainer.extend(extensions.Evaluator(test_iter, model, device=args.gpu))
-    trainer.extend(extensions.ProgressBar(update_interval=10))
+    trainer.extend(extensions.ProgressBar(update_interval=100))
 
     # Run
     trainer.run()
 
-    # Save generator model
+    # Save model
     if args.gpu >= 0:
         model.to_cpu()
     chainer.serializers.save_npz(os.path.join(args.out, 'model.npz'), model)
+
+    with open(os.path.join(args.out, 'labels.json'), 'w') as f:
+        json.dump({v: k for k, v in labels.items()}, f)
 
 
 if __name__ == '__main__':

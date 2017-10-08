@@ -1,6 +1,5 @@
 import io
 
-import chainer
 from chainer.dataset import dataset_mixin
 import numpy as np
 from PIL import Image
@@ -8,7 +7,7 @@ from pymongo import MongoClient
 
 
 class DatasetfromMongoDB(dataset_mixin.DatasetMixin):
-    def __init__(self, db_name='cicc', col_name='train', dtype=np.float32):
+    def __init__(self, db_name, col_name, dtype=np.float32, _id=False):
         self._dtype = dtype
         self._label_dtype = np.int32
 
@@ -17,6 +16,8 @@ class DatasetfromMongoDB(dataset_mixin.DatasetMixin):
         self.col = db[col_name]
         self.examples = list(self.col.find({}, {'imgs': 0}))
         self.labels = self.get_labels()
+
+        self._id_flag = _id
 
     def __len__(self):
         return len(self.examples)
@@ -34,10 +35,9 @@ class DatasetfromMongoDB(dataset_mixin.DatasetMixin):
         img = np.asarray(img, dtype=self._dtype).transpose(2, 0, 1)
         img = img / 255.
 
-        if chainer.config.train:
+        if self._id_flag:
+            return img, _id
+        else:
             label = self.labels[doc['category_id']]
             label = np.array(label, dtype=self._label_dtype)
-
             return img, label
-        else:
-            return img, _id
