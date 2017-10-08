@@ -1,4 +1,4 @@
-kernel for Cdiscount’s Image Classification Challenge Kaggle competition.
+Chainer kernel for Cdiscount’s Image Classification Challenge Kaggle competition.
 
 # Requirements
 
@@ -18,13 +18,19 @@ $ kg download -u <username> -p <password> -c cdiscount-image-classification-chal
 ## Setup MongoDB
 
 ``` sh
-$ sudo mongod --dbpath data/mongodb --logpath data/mongodb.log
-$ mongorestore -v --db cicc data/train.bson
-$ mongorestore -v --db cicc data/test.bson
+$ sudo mongod --dbpath mongodb
+$ mongorestore -v --db cicc train.bson
+$ mongorestore -v --db cicc test.bson
 ```
 
-# train
+# Training
 
 ``` sh
 $ python train.py
+```
+
+# Inference
+
+``` sh
+$ python infer.py
 ```

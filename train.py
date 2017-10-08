@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 import chainer
@@ -13,15 +14,15 @@ except Exception:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Chainer example: DCGAN')
-    parser.add_argument('--batchsize', '-b', type=int, default=50,
+    parser = argparse.ArgumentParser(description='Kaggle Kernel')
+    parser.add_argument('--batchsize', '-b', type=int, default=16,
                         help='Number of images in each mini-batch')
-    parser.add_argument('--epoch', '-e', type=int, default=1000,
+    parser.add_argument('--epoch', '-e', type=int, default=100,
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--db_name', '-d', default='cicc')
-    parser.add_argument('--col_name', '-c', default='train_example')
+    parser.add_argument('--col_name', '-c', default='train')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
     parser.add_argument('--resume', '-r', default='',
@@ -35,7 +36,10 @@ def main():
 
     # Dataset
     dataset = DatasetfromMongoDB(db_name=args.db_name, col_name=args.col_name)
-    n_classes = len(dataset.get_labels())
+    labels = dataset.get_labels()
+    with open(os.path.join(args.out, 'labels.json'), 'w') as f:
+        json.dump({v: k for k, v in labels.items()}, f)
+    n_classes = len(labels)
 
     split_at = int(len(dataset) * args.split_rate)
     train, test = chainer.datasets.split_dataset(dataset, split_at)
