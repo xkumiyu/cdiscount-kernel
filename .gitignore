@@ -133,3 +133,4 @@ ENV/
 .kaggle-cli/
 data/
 result/
+tmp/

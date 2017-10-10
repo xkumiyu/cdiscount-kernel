@@ -9,7 +9,7 @@ import pandas as pd
 
 
 try:
-    from dataset import PreprocessedDataset
+    from dataset import DatasetwithJPEG
     from net import LeNet
 except Exception:
     raise
@@ -34,7 +34,7 @@ def main():
     # Dataset
     all_files = os.listdir(args.dataset)
     image_files = [(f, f.split('-')[0]) for f in all_files if ('png' in f or 'jpg' in f)]
-    dataset = PreprocessedDataset(image_files, args.dataset)
+    dataset = DatasetwithJPEG(image_files, args.dataset)
     n_classes = 5270
 
     labels = pd.read_csv(args.labels)

@@ -10,9 +10,15 @@ Download data using [kaggle-cli](https://github.com/floydwch/kaggle-cli).
 $ kg download -u <username> -p <password> -c cdiscount-image-classification-challenge
 ```
 
+Extract the file.
+
+``` sh
+$ 7z x category_names.7z
+```
+
 ## Data conversion
 
-Convert BSON to jpeg file. It takes several hours to convert.
+Convert BSON to jpeg file.
 
 ``` sh
 $ convert_BSON_to_files.py -d train -r <data directory>
@@ -65,3 +71,7 @@ $ python infer.py
 
 * 3,095,080 files
 * image files: 21GB
+
+---
+
+files: 0.86055 iters/sec.

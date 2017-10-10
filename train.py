@@ -1,20 +1,51 @@
 import argparse
 import os
+import threading
 
 import chainer
 import chainer.links as L
 from chainer.training import extensions
+import pandas as pd
 
 try:
-    from dataset import PreprocessedDataset
+    from create_lookup_tables import make_category_tables
+    from dataset import DatasetwithBSON
+    from dataset import DatasetwithJPEG
     from net import LeNet
 except Exception:
     raise
 
 
+def setup_dataset_with_bson(root):
+    train_bson_path = os.path.join(root, 'train_example.bson')
+    categories_df = pd.read_csv(os.path.join(root, 'categories.csv'), index_col=0)
+    cat2idx, idx2cat = make_category_tables(categories_df)
+
+    offsets_df = pd.read_csv(os.path.join(root, 'train_offsets.csv'), index_col=0)
+    train_images_df = pd.read_csv(os.path.join(root, 'train_images.csv'), index_col=0)
+    val_images_df = pd.read_csv(os.path.join(root, 'val_images.csv'), index_col=0)
+
+    bson_file = open(train_bson_path, 'rb')
+    lock = threading.Lock()
+
+    train = DatasetwithBSON(bson_file, train_images_df, offsets_df, cat2idx, lock)
+    val = DatasetwithBSON(bson_file, val_images_df, offsets_df, cat2idx, lock)
+
+    return train, val
+
+
+def setup_dataset_with_jpeg(root, listfile, split_rate, seed):
+    dataset = DatasetwithJPEG(listfile, root)
+
+    split_at = int(len(dataset) * split_rate)
+    train, val = chainer.datasets.split_dataset_random(dataset, split_at, seed)
+
+    return train, val
+
+
 def main():
     parser = argparse.ArgumentParser(description='Kaggle Kernel')
-    parser.add_argument('dataset', help='Path to training image-label list file')
+    parser.add_argument('--listfile', '-l', help='Path to training image-label list file')
     parser.add_argument('--batchsize', '-b', type=int, default=16,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=100,
@@ -28,10 +59,12 @@ def main():
     parser.add_argument('--root', '-R', default='.',
                         help='Root directory path of image files')
     parser.add_argument('--split_rate', type=float, default=0.8)
-    parser.add_argument('--snapshot_interval', type=int, default=1000,
+    parser.add_argument('--snapshot_interval', type=int, default=10000,
                         help='Interval of snapshot')
     parser.add_argument('--display_interval', type=int, default=100,
                         help='Interval of displaying log to console')
+    parser.add_argument('--log_interval', type=int, default=1000,
+                        help='Interval of log to output')
     parser.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()
 
@@ -40,21 +73,20 @@ def main():
     print('# epoch: {}'.format(args.epoch))
 
     # Dataset
-    dataset = PreprocessedDataset(args.dataset, args.root)
+    # train, val = setup_dataset_with_bson(args.root)
+    train, val = setup_dataset_with_jpeg(args.root, args.listfile, args.split_rate, args.seed)
     n_classes = 5270
 
-    split_at = int(len(dataset) * args.split_rate)
-    train, test = chainer.datasets.split_dataset_random(dataset, split_at, args.seed)
-
+    print('# iterators / epoch: {}'.format(int(len(train) / args.batchsize)))
     print('# train samples: {}'.format(len(train)))
-    print('# test samples: {}'.format(len(test)))
+    print('# validation samples: {}'.format(len(val)))
     print('# data shape: {}'.format(train[0][0].shape))
     print('# number of label: {}'.format(n_classes))
 
     # Iterator
     train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
-    test_iter = chainer.iterators.SerialIterator(
-        test, args.batchsize, repeat=False, shuffle=False)
+    val_iter = chainer.iterators.SerialIterator(
+        val, args.batchsize, repeat=False, shuffle=False)
 
     # Model
     model = L.Classifier(LeNet(n_classes))
@@ -75,8 +107,10 @@ def main():
 
     snapshot_interval = (args.snapshot_interval, 'iteration')
     display_interval = (args.display_interval, 'iteration')
+    log_interval = (args.log_interval, 'iteration')
 
-    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.Evaluator(val_iter, model, device=args.gpu))
+    trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'main/loss', 'main/accuracy',
         'validation/main/loss', 'validation/main/accuracy', 'elapsed_time']),
@@ -86,7 +120,6 @@ def main():
         trigger=snapshot_interval)
     trainer.extend(extensions.snapshot_object(
         model, 'model_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
-    trainer.extend(extensions.Evaluator(test_iter, model, device=args.gpu))
     trainer.extend(extensions.ProgressBar(update_interval=10))
 
     if args.resume:
