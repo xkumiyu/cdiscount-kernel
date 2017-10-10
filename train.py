@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import threading
 
 import chainer
@@ -7,11 +8,15 @@ import chainer.links as L
 from chainer.training import extensions
 import pandas as pd
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/model')
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
+
 try:
     from create_lookup_tables import make_category_tables
     from dataset import DatasetwithBSON
     from dataset import DatasetwithJPEG
-    from net import LeNet
+    from lenet import LeNet
+    from vgg import VGG
 except Exception:
     raise
 
@@ -44,8 +49,15 @@ def setup_dataset_with_jpeg(root, listfile, split_rate, seed):
 
 
 def main():
+    archs = {
+        'lenet': LeNet,
+        'vgg': VGG
+    }
+
     parser = argparse.ArgumentParser(description='Kaggle Kernel')
     parser.add_argument('--listfile', '-l', help='Path to training image-label list file')
+    parser.add_argument('--arch', '-a', default='lenet',
+                        choices=['lenet', 'vgg'])
     parser.add_argument('--batchsize', '-b', type=int, default=16,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=100,
@@ -89,7 +101,8 @@ def main():
         val, args.batchsize, repeat=False, shuffle=False)
 
     # Model
-    model = L.Classifier(LeNet(n_classes))
+    model = L.Classifier(archs[args.arch](n_classes))
+    print('# model: {}'.format(args.arch))
 
     if args.gpu >= 0:
         model.to_gpu(args.gpu)

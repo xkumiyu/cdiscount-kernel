@@ -79,8 +79,10 @@ def main():
         sum_loss += float(loss.data) * len(t.data)
         sum_accuracy += float(model.accuracy.data) * len(t.data)
         pbar.update()
+    pbar.close()
 
-    print('val mean loss: {:4f}, accuracy: {:4f}'.format(sum_loss / len(val), sum_accuracy / len(val)))
+    print('val mean loss: {:4f}, accuracy: {:4f}'.format(
+        sum_loss / len(val), sum_accuracy / len(val)))
 
 
 if __name__ == '__main__':
