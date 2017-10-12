@@ -2,6 +2,7 @@ import io
 
 import bson
 import chainer
+from chainer.links.model.vision.resnet import prepare
 import numpy as np
 from PIL import Image
 
@@ -53,5 +54,6 @@ class DatasetwithJPEG(chainer.dataset.DatasetMixin):
 
     def get_example(self, i):
         image, label = self.base[i]
-        image = image / 255.
+        image = prepare(image)
+        # image = image / 255.
         return image, label

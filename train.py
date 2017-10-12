@@ -3,6 +3,12 @@ import os
 import sys
 import threading
 
+import matplotlib
+try:
+    matplotlib.use('Agg')
+except Exception:
+    raise
+
 import chainer
 import chainer.links as L
 from chainer.training import extensions
@@ -16,6 +22,7 @@ try:
     from dataset import DatasetwithBSON
     from dataset import DatasetwithJPEG
     from lenet import LeNet
+    from resnet import ResNet152
     from vgg import VGG
 except Exception:
     raise
@@ -51,13 +58,14 @@ def setup_dataset_with_jpeg(root, listfile, split_rate, seed):
 def main():
     archs = {
         'lenet': LeNet,
-        'vgg': VGG
+        'vgg': VGG,
+        'resnet152': ResNet152,
     }
 
     parser = argparse.ArgumentParser(description='Kaggle Kernel')
     parser.add_argument('--listfile', '-l', help='Path to training image-label list file')
     parser.add_argument('--arch', '-a', default='lenet',
-                        choices=['lenet', 'vgg'])
+                        choices=['lenet', 'vgg', 'resnet152'])
     parser.add_argument('--batchsize', '-b', type=int, default=16,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=100,
@@ -70,7 +78,7 @@ def main():
                         help='Resume the training from snapshot')
     parser.add_argument('--root', '-R', default='.',
                         help='Root directory path of image files')
-    parser.add_argument('--split_rate', type=float, default=0.8)
+    parser.add_argument('--split_rate', type=float, default=0.99)
     parser.add_argument('--snapshot_interval', type=int, default=10000,
                         help='Interval of snapshot')
     parser.add_argument('--display_interval', type=int, default=100,
@@ -108,7 +116,8 @@ def main():
         model.to_gpu(args.gpu)
 
     # Updater
-    optimizer = chainer.optimizers.Adam(alpha=1e-4)
+    # optimizer = chainer.optimizers.Adam(alpha=1e-4)
+    optimizer = chainer.optimizers.MomentumSGD(lr=0.01, momentum=0.9)
     optimizer.setup(model)
 
     updater = chainer.training.StandardUpdater(
@@ -122,12 +131,15 @@ def main():
     display_interval = (args.display_interval, 'iteration')
     log_interval = (args.log_interval, 'iteration')
 
-    trainer.extend(extensions.Evaluator(val_iter, model, device=args.gpu))
+    trainer.extend(extensions.Evaluator(val_iter, model, device=args.gpu), trigger=log_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'main/loss', 'main/accuracy',
         'validation/main/loss', 'validation/main/accuracy', 'elapsed_time']),
         trigger=display_interval)
+    trainer.extend(extensions.PlotReport([
+        'main/accuracy', 'validation/main/accuracy'],
+        trigger=log_interval, file_name='accuracy.png'))
     trainer.extend(
         extensions.snapshot(filename='snapshot_iter_{.updater.iteration}.npz'),
         trigger=snapshot_interval)
@@ -146,6 +158,8 @@ def main():
     if args.gpu >= 0:
         model.to_cpu()
     chainer.serializers.save_npz(os.path.join(args.out, 'model.npz'), model)
+
+    print('Finished!')
 
 
 if __name__ == '__main__':
