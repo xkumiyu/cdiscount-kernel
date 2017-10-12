@@ -1,26 +1,44 @@
 import argparse
+from collections import defaultdict
 import os
+import sys
 
 import chainer
 from chainer.dataset import convert
-# import chainer.functions as F
+import chainer.functions as F
 import chainer.links as L
+import numpy as np
 import pandas as pd
+from tqdm import tqdm
+
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/model')
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
 
 
 try:
     from dataset import DatasetwithJPEG
-    from net import LeNet
+    from lenet import LeNet
+    from resnet import ResNet152
+    from vgg import VGG
 except Exception:
     raise
 
 
 def main():
+    archs = {
+        'lenet': LeNet,
+        'vgg': VGG,
+        'resnet152': ResNet152,
+    }
+
     parser = argparse.ArgumentParser(description='Predict')
     parser.add_argument('dataset', help='Path to test image-label')
+    parser.add_argument('--arch', '-a', default='lenet',
+                        choices=['lenet', 'vgg', 'resnet152'])
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--batchsize', '-b', type=int, default=16,
+    parser.add_argument('--batchsize', '-b', type=int, default=32,
                         help='Number of images in each mini-batch')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
@@ -43,10 +61,11 @@ def main():
     print('# samples: {}'.format(len(dataset)))
     print('# data shape: {}'.format(dataset[0][0].shape))
     print('# number of label: {}'.format(n_classes))
-    print('')
 
     # Model
-    model = L.Classifier(LeNet(n_classes))
+    model = L.Classifier(archs[args.arch](n_classes))
+    print('# model: {}'.format(args.arch))
+    print('')
     chainer.serializers.load_npz(os.path.join(args.out, args.model), model)
     if args.gpu >= 0:
         model.to_gpu(args.gpu)
@@ -54,23 +73,38 @@ def main():
     # Iterator
     test_iter = chainer.iterators.SerialIterator(
         dataset, args.batchsize, repeat=False, shuffle=False)
+    n_iter = int(len(dataset) / args.batchsize)
 
     # Infer
-    result = {'_id': [], 'category_id': []}
+    y_pred = defaultdict(list)
+    pbar = tqdm(total=n_iter)
     for batch in test_iter:
         x_array, _id_array = convert.concat_examples(batch, args.gpu)
-        y_array = model.predictor(x_array).data.argmax(axis=1)
-        # y_array = F.softmax(model.predictor(x_array)).data.argmax(axis=1)
-        l_array = [label_to_categpry[y] for y in y_array]
+        y_array = F.softmax(model.predictor(x_array)).data
 
-        result['_id'].extend(list(_id_array))
-        result['category_id'].extend(l_array)
-    df = pd.DataFrame(
-        result['category_id'], result['_id'], columns=['category_id'])
-    df.index.name = '_id'
-    df = df[~df.index.duplicated()]
+        if args.gpu >= 0:
+            _id_array = chainer.cuda.to_cpu(_id_array)
+            y_array = chainer.cuda.to_cpu(y_array)
 
+        for _id, y in zip(list(_id_array), y_array):
+            y_pred[_id].append(y)
+        pbar.update()
+    pbar.close()
+
+    def select_category(y):
+        label = np.asarray(y).sum(axis=0).argmax()
+        category_id = label_to_categpry[label]
+        return category_id
+
+    result = [(_id, select_category(y)) for _id, y in y_pred.items()]
+    df = pd.DataFrame(result,  columns=['_id', 'category_id'])
+    df.set_index('_id')
+
+    # df = df[~df.index.duplicated()]
     df.to_csv(os.path.join(args.out, 'submission.csv'))
+
+    # correct products size: 1768183
+    print('Inference Finished: {} products'.format(len(df)))
 
 
 if __name__ == '__main__':

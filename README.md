@@ -1,5 +1,9 @@
 Chainer kernel for [Cdiscount’s Image Classification Challenge](https://www.kaggle.com/c/cdiscount-image-classification-challenge) Kaggle competition.
 
+# Requirements
+
+* Chainer 3.0.0
+
 # Preparation
 
 ## Downloading data
@@ -21,8 +25,8 @@ $ 7z x category_names.7z
 Convert BSON to jpeg file.
 
 ``` sh
-$ convert_BSON_to_files.py -d train -r <data directory>
-$ convert_BSON_to_files.py -d test -r <data directory>
+$ util/convert_BSON_to_files.py -d train -r <data directory>
+$ util/convert_BSON_to_files.py -d test -r <data directory>
 ```
 
 category_names.csv, train.bson, test.bson is necessary in <data directory>.
@@ -36,7 +40,7 @@ This script referred to [this notebook](https://www.kaggle.com/bguberfain/not-so
 ## Make image label list
 
 ``` sh
-$ python make_image_label_list.py
+$ python util/make_image_label_list.py
 ```
 
 # Training
@@ -48,7 +52,7 @@ $ python train.py
 # Inference
 
 ``` sh
-$ python infer.py
+$ python infer.py <test data directory>
 ```
 
 # Appendix
