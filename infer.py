@@ -98,12 +98,12 @@ def main():
 
     result = [(_id, select_category(y)) for _id, y in y_pred.items()]
     df = pd.DataFrame(result,  columns=['_id', 'category_id'])
-    df.set_index('_id')
+    df = df.set_index('_id')
 
     # df = df[~df.index.duplicated()]
     df.to_csv(os.path.join(args.out, 'submission.csv'))
 
-    # correct products size: 1768183
+    # correct products size: 1768182
     print('Inference Finished: {} products'.format(len(df)))
 
 
