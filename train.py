@@ -1,7 +1,6 @@
 import argparse
 import os
 import sys
-import threading
 
 import matplotlib
 try:
@@ -12,63 +11,22 @@ except Exception:
 import chainer
 import chainer.links as L
 from chainer.training import extensions
-import pandas as pd
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/model')
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
 
 try:
-    from create_lookup_tables import make_category_tables
-    from dataset import DatasetwithBSON
     from dataset import DatasetwithJPEG
-    from lenet import LeNet
-    from resnet import ResNet152
-    from vgg import VGG
+    from model import ResNet152
 except Exception:
     raise
 
 
-def setup_dataset_with_bson(root):
-    train_bson_path = os.path.join(root, 'train_example.bson')
-    categories_df = pd.read_csv(os.path.join(root, 'categories.csv'), index_col=0)
-    cat2idx, idx2cat = make_category_tables(categories_df)
-
-    offsets_df = pd.read_csv(os.path.join(root, 'train_offsets.csv'), index_col=0)
-    train_images_df = pd.read_csv(os.path.join(root, 'train_images.csv'), index_col=0)
-    val_images_df = pd.read_csv(os.path.join(root, 'val_images.csv'), index_col=0)
-
-    bson_file = open(train_bson_path, 'rb')
-    lock = threading.Lock()
-
-    train = DatasetwithBSON(bson_file, train_images_df, offsets_df, cat2idx, lock)
-    val = DatasetwithBSON(bson_file, val_images_df, offsets_df, cat2idx, lock)
-
-    return train, val
-
-
-def setup_dataset_with_jpeg(root, listfile, split_rate, seed):
-    dataset = DatasetwithJPEG(listfile, root)
-
-    split_at = int(len(dataset) * split_rate)
-    train, val = chainer.datasets.split_dataset_random(dataset, split_at, seed)
-
-    return train, val
-
-
 def main():
-    archs = {
-        'lenet': LeNet,
-        'vgg': VGG,
-        'resnet152': ResNet152,
-    }
-
     parser = argparse.ArgumentParser(description='Kaggle Kernel')
-    parser.add_argument('--listfile', '-l', help='Path to training image-label list file')
-    parser.add_argument('--arch', '-a', default='lenet',
-                        choices=['lenet', 'vgg', 'resnet152'])
-    parser.add_argument('--batchsize', '-b', type=int, default=16,
+    parser.add_argument('listfile', help='Path to training image-label list file')
+    parser.add_argument('--batchsize', '-b', type=int, default=32,
                         help='Number of images in each mini-batch')
-    parser.add_argument('--epoch', '-e', type=int, default=100,
+    parser.add_argument('--epoch', '-e', type=int, default=10,
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
@@ -93,8 +51,9 @@ def main():
     print('# epoch: {}'.format(args.epoch))
 
     # Dataset
-    # train, val = setup_dataset_with_bson(args.root)
-    train, val = setup_dataset_with_jpeg(args.root, args.listfile, args.split_rate, args.seed)
+    dataset = DatasetwithJPEG(args.listfile, args.root)
+    split_at = int(len(dataset) * args.split_rate)
+    train, val = chainer.datasets.split_dataset_random(dataset, split_at, args.seed)
     n_classes = 5270
 
     print('# iterators / epoch: {}'.format(int(len(train) / args.batchsize)))
@@ -109,11 +68,10 @@ def main():
         val, args.batchsize, repeat=False, shuffle=False)
 
     # Model
-    model = L.Classifier(archs[args.arch](n_classes))
-    print('# model: {}'.format(args.arch))
-
+    model = L.Classifier(ResNet152(n_classes))
     if args.gpu >= 0:
-        model.to_gpu(args.gpu)
+        chainer.cuda.get_device_from_id(args.gpu).use()
+        model.to_gpu()
 
     # Updater
     # optimizer = chainer.optimizers.Adam(alpha=1e-4)

@@ -18,24 +18,14 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
 
 try:
     from dataset import DatasetwithJPEG
-    from lenet import LeNet
     from resnet import ResNet152
-    from vgg import VGG
 except Exception:
     raise
 
 
 def main():
-    archs = {
-        'lenet': LeNet,
-        'vgg': VGG,
-        'resnet152': ResNet152,
-    }
-
     parser = argparse.ArgumentParser(description='Predict')
     parser.add_argument('dataset', help='Path to test image-label')
-    parser.add_argument('--arch', '-a', default='lenet',
-                        choices=['lenet', 'vgg', 'resnet152'])
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--batchsize', '-b', type=int, default=32,
@@ -61,14 +51,14 @@ def main():
     print('# samples: {}'.format(len(dataset)))
     print('# data shape: {}'.format(dataset[0][0].shape))
     print('# number of label: {}'.format(n_classes))
+    print('')
 
     # Model
-    model = L.Classifier(archs[args.arch](n_classes))
-    print('# model: {}'.format(args.arch))
-    print('')
+    model = L.Classifier(ResNet152(n_classes))
     chainer.serializers.load_npz(os.path.join(args.out, args.model), model)
     if args.gpu >= 0:
-        model.to_gpu(args.gpu)
+        chainer.cuda.get_device_from_id(args.gpu).use()
+        model.to_gpu()
 
     # Iterator
     test_iter = chainer.iterators.SerialIterator(
