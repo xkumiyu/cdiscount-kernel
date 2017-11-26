@@ -46,7 +46,7 @@ $ python util/make_image_label_list.py
 # Training
 
 ``` sh
-$ python train.py
+$ python train.py <train data list>
 ```
 
 # Inference

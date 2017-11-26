@@ -34,6 +34,7 @@ def main():
                         help='Directory to output the result')
     parser.add_argument('--model', '-m', default='model.npz')
     parser.add_argument('--labels', '-l', default='labels.csv')
+    parser.add_argument('--crops', '-c', type=int, default=0)
     args = parser.parse_args()
 
     print('GPU: {}'.format(args.gpu))
@@ -42,7 +43,10 @@ def main():
     # Dataset
     all_files = os.listdir(args.dataset)
     image_files = [(f, f.split('-')[0]) for f in all_files if ('png' in f or 'jpg' in f)]
-    dataset = DatasetwithJPEG(image_files, args.dataset)
+    if args.crops > 0:
+        dataset = DatasetwithJPEG(image_files, args.dataset, True)
+    else:
+        dataset = DatasetwithJPEG(image_files, args.dataset)
     n_classes = 5270
 
     labels = pd.read_csv(args.labels)
@@ -66,19 +70,27 @@ def main():
     n_iter = int(len(dataset) / args.batchsize)
 
     # Infer
+    def predict(test_iter, y_pred, pbar):
+        for batch in test_iter:
+            x_array, _id_array = convert.concat_examples(batch, args.gpu)
+            y_array = F.softmax(model.predictor(x_array)).data
+
+            if args.gpu >= 0:
+                _id_array = chainer.cuda.to_cpu(_id_array)
+                y_array = chainer.cuda.to_cpu(y_array)
+
+            for _id, y in zip(list(_id_array), y_array):
+                y_pred[_id].append(y)
+            pbar.update()
+
     y_pred = defaultdict(list)
-    pbar = tqdm(total=n_iter)
-    for batch in test_iter:
-        x_array, _id_array = convert.concat_examples(batch, args.gpu)
-        y_array = F.softmax(model.predictor(x_array)).data
-
-        if args.gpu >= 0:
-            _id_array = chainer.cuda.to_cpu(_id_array)
-            y_array = chainer.cuda.to_cpu(y_array)
-
-        for _id, y in zip(list(_id_array), y_array):
-            y_pred[_id].append(y)
-        pbar.update()
+    if args.crops > 0:
+        pbar = tqdm(total=n_iter * args.crops)
+        for _ in range(args.crops):
+            y_pred = predict(test_iter, y_pred, pbar)
+    else:
+        pbar = tqdm(total=n_iter)
+        y_pred = predict(test_iter, y_pred, pbar)
     pbar.close()
 
     def select_category(y):
@@ -90,8 +102,7 @@ def main():
     df = pd.DataFrame(result,  columns=['_id', 'category_id'])
     df = df.set_index('_id')
 
-    # df = df[~df.index.duplicated()]
-    df.to_csv(os.path.join(args.out, 'submission.csv'))
+    df.to_csv(os.path.join(args.out, 'submission.csv.gz'), compression='gzip')
 
     # correct products size: 1768182
     print('Inference Finished: {} products'.format(len(df)))
