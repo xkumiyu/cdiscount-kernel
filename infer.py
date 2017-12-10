@@ -1,7 +1,6 @@
 import argparse
 from collections import defaultdict
 import os
-import sys
 
 import chainer
 from chainer.dataset import convert
@@ -11,16 +10,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/model')
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
-
-
-try:
-    from dataset import DatasetwithJPEG
-    from resnet import ResNet152
-except Exception:
-    raise
+from dataset import DatasetwithJPEG
+from model import ResNet152
 
 
 def main():
@@ -82,6 +73,7 @@ def main():
             for _id, y in zip(list(_id_array), y_array):
                 y_pred[_id].append(y)
             pbar.update()
+        return y_pred
 
     y_pred = defaultdict(list)
     if args.crops > 0:

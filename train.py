@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 import matplotlib
 try:
@@ -12,13 +11,8 @@ import chainer
 import chainer.links as L
 from chainer.training import extensions
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/util')
-
-try:
-    from dataset import DatasetwithJPEG
-    from model import ResNet152
-except Exception:
-    raise
+from dataset import DatasetwithJPEG
+from model import ResNet152
 
 
 def main():

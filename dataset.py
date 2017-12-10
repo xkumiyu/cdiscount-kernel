@@ -7,6 +7,7 @@ class DatasetwithJPEG(chainer.dataset.DatasetMixin):
 
     def __init__(self, path, root, crop=False):
         self.base = chainer.datasets.LabeledImageDataset(path, root)
+        self.crop = crop
 
     def __len__(self):
         return len(self.base)
