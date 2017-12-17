@@ -1,6 +1,6 @@
 import chainer
 from chainer.links.model.vision.resnet import prepare
-import random
+import numpy as np
 
 
 class DatasetwithJPEG(chainer.dataset.DatasetMixin):
@@ -19,13 +19,16 @@ class DatasetwithJPEG(chainer.dataset.DatasetMixin):
         image = prepare(image)
         return image, label
 
-    def random_crop(self, image):
-        _, h, w = image.shape
-        crop_size = random.randint(0, h // 2)
-        top = random.randint(0, h - crop_size - 1)
-        left = random.randint(0, w - crop_size - 1)
-        if random.randint(0, 1):
+    def random_crop(self, image, rate=0.5):
+        if np.random.rand() < rate:
             image = image[:, :, ::-1]
+        if np.random.rand() < rate:
+            return image
+        _, h, w = image.shape
+        crop_size = np.random.randint(h // 2, h)
+        top = np.random.randint(0, h - crop_size)
+        left = np.random.randint(0, w - crop_size)
+
         bottom = top + crop_size
         right = left + crop_size
         image = image[:, top:bottom, left:right]
